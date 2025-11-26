@@ -1,0 +1,40 @@
+# Dataset files (too large for git)
+*.log
+*.csv
+http_requests_labeled.csv
+access.log
+
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+env/
+venv/
+*.egg-info/
+dist/
+build/
+
+# Model files (can be regenerated)
+*.pkl
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Arduino/PlatformIO build files
+*.hex
+*.elf
+*.bin
+.pio/
+
+# Logs
+*.log
