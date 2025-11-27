@@ -24,9 +24,10 @@ A machine learning-based mini Web Application Firewall (WAF) running on ESP8266 
 - ⚡ **<5ms inference time** - Real-time detection on 80MHz ESP8266
 - 🛡️ **100% Attack Detection** - Blocks SQL injection, XSS, path traversal, admin panel scanning
 - 🔌 **Reverse proxy design** - Sits between client and backend
-- ✅ **Production Ready** - Tested on real hardware with 81% overall success rate
+- 📊 **Real-time Dashboard** - React-based monitoring with live event feed
+- ✅ **Production Ready** - Tested on real hardware with 100% attack detection rate
 
-> ✅ **Status:** Fully tested and working on ESP8266 hardware. Successfully blocks all common web attacks with zero false positives.
+> ✅ **Status:** Fully tested and working on ESP8266 hardware. Successfully blocks all common web attacks with zero false positives. Includes real-time monitoring dashboard.
 
 ---
 
@@ -254,10 +255,22 @@ TinyMLProject/
 │       ├── model_weights.h      # MLP(8) weights & inference
 │       └── esp8266_features.h   # Feature extraction (C)
 │
-└── backend_api/                  # Test backend server
-    ├── README.md                # Backend documentation
-    ├── requirements.txt         # Flask dependencies
-    └── app.py                   # Flask API server
+├── backend_api/                  # Test backend server
+│   ├── README.md                # Backend documentation
+│   ├── requirements.txt         # Flask dependencies
+│   └── app.py                   # Flask API server
+│
+├── dashboard_backend/            # Dashboard API backend
+│   ├── README.md                # Dashboard backend docs
+│   ├── requirements.txt         # Flask + CORS dependencies
+│   └── app.py                   # Real-time event API
+│
+└── dashboard_frontend/           # React Dashboard
+    ├── README.md                # Dashboard frontend docs
+    ├── package.json             # Node dependencies
+    └── src/
+        ├── App.js               # Main React component
+        └── App.css              # Dashboard styling
 ```
 
 > **Note:** Dataset files (`access.log`, `*.csv`) are excluded from git due to size. Download from Kaggle.
@@ -349,6 +362,115 @@ Total: ~200 floating point operations
 - ✅ Stable WiFi connection
 - ✅ Consistent inference times
 - ✅ Backend integration working perfectly
+- ✅ Dashboard reporting working perfectly
+
+---
+
+## 📊 Real-time Dashboard
+
+### Overview
+The project includes a modern, React-based dashboard for real-time monitoring of WAF events.
+
+### Features
+
+**📈 Statistics Cards:**
+- **Total Requests:** Overall request count
+- **Allowed:** Benign requests (green)
+- **Blocked:** Malicious requests (red)
+- **Block Rate:** Percentage of blocked requests
+
+**📋 Live Event Feed:**
+- Auto-refresh every 2 seconds
+- Last 50 events displayed
+- Color-coded events (green=allowed, red=blocked)
+- Detailed information for each event:
+  - Event ID & Timestamp
+  - HTTP Method & Path
+  - Client IP & ESP IP
+  - User-Agent
+  - Probability score
+  - Classification (BENIGN/MALICIOUS)
+  - Action taken (ALLOWED/BLOCKED)
+
+**🎨 Modern UI:**
+- Gradient background design
+- Card-based layout
+- Responsive (mobile-friendly)
+- Smooth animations
+- Real-time updates
+
+**🔧 Controls:**
+- **Pause/Resume:** Stop/start auto-refresh
+- **Refresh Now:** Manual update
+- **Clear All:** Remove all events
+
+### Dashboard Architecture
+
+```
+┌─────────────────────────────────────────────────────────┐
+│                    ESP8266 WAF                          │
+│  (Analyzes requests & reports to dashboard)             │
+└────────────────────┬────────────────────────────────────┘
+                     │ HTTP POST /api/report
+                     │ JSON: {method, path, probability...}
+                     ▼
+┌─────────────────────────────────────────────────────────┐
+│              Dashboard Backend (Flask)                   │
+│  - Receives events from ESP8266                         │
+│  - Stores in memory (last 1000 events)                  │
+│  - Provides REST API                                     │
+└────────────────────┬────────────────────────────────────┘
+                     │ REST API
+                     │ GET /api/stats, /api/events
+                     ▼
+┌─────────────────────────────────────────────────────────┐
+│           Dashboard Frontend (React)                     │
+│  - Real-time event display                              │
+│  - Statistics visualization                              │
+│  - Auto-refresh every 2s                                │
+└─────────────────────────────────────────────────────────┘
+```
+
+### Screenshots
+
+**Dashboard View:**
+```
+┌──────────────────────────────────────────────────────┐
+│     🛡️ ESP8266 TinyML WAF Dashboard                 │
+│     Real-time Web Application Firewall Monitoring    │
+└──────────────────────────────────────────────────────┘
+
+  [⏸️ Pause]  [🔄 Refresh]  [🗑️ Clear All]
+
+┌─────────┐ ┌─────────┐ ┌─────────┐ ┌─────────┐
+│📊 Total │ │✅ Allow │ │🚫 Block │ │📈 Rate  │
+│   21    │ │    8    │ │   13    │ │ 61.9%   │
+└─────────┘ └─────────┘ └─────────┘ └─────────┘
+
+Last updated: 11/27/2025, 11:06:23 AM
+
+┌──────────────────────────────────────────────────────┐
+│ 📋 Recent Events                                      │
+├──────────────────────────────────────────────────────┤
+│ #13  🚫 BLOCKED                    11:06:23 AM       │
+│ Method: GET  Path: /admin                            │
+│ Client IP: 192.168.1.100  ESP IP: 192.168.1.50      │
+│ User-Agent: Mozilla/5.0                              │
+│ Probability: 100.00%  Classification: MALICIOUS      │
+├──────────────────────────────────────────────────────┤
+│ #12  ✅ ALLOWED                    11:06:20 AM       │
+│ Method: GET  Path: /product/12345                    │
+│ Client IP: 192.168.1.100  ESP IP: 192.168.1.50      │
+│ User-Agent: Mozilla/5.0 Chrome/91.0                  │
+│ Probability: 0.00%  Classification: BENIGN           │
+└──────────────────────────────────────────────────────┘
+```
+
+### Access Dashboard
+
+1. Start backend: `cd dashboard_backend && python3 app.py`
+2. Start frontend: `cd dashboard_frontend && npm start`
+3. Open browser: `http://localhost:3000`
 
 ---
 
@@ -391,7 +513,27 @@ python3 export_model_to_c.py
 # Upload to ESP8266
 ```
 
-### 5️⃣ Test
+### 5️⃣ Start Dashboard (Optional)
+```bash
+# Terminal 1: Dashboard Backend
+cd dashboard_backend
+pip3 install -r requirements.txt
+python3 app.py
+
+# Terminal 2: Dashboard Frontend
+cd dashboard_frontend
+npm install
+npm start
+
+# Terminal 3: Test Backend
+cd backend_api
+pip3 install -r requirements.txt
+python3 app.py
+```
+
+Dashboard will be available at `http://localhost:3000`
+
+### 6️⃣ Test
 ```bash
 cd python_training
 
@@ -472,7 +614,7 @@ const float MALICIOUS_THRESHOLD = 0.5f;
 ### Medium Priority
 - [ ] Port to ESP32 (more powerful, dual-core)
 - [ ] IP-based behavioral features (f19-f21)
-- [ ] Web dashboard for real-time monitoring
+- [x] ~~Web dashboard for real-time monitoring~~ ✅ **COMPLETED**
 - [ ] HTTPS/TLS support
 
 ### Low Priority
@@ -480,6 +622,13 @@ const float MALICIOUS_THRESHOLD = 0.5f;
 - [ ] Whitelist/blacklist mechanism
 - [ ] Online learning capability
 - [ ] Multi-model ensemble
+
+### Dashboard Enhancements
+- [ ] Historical data storage (database integration)
+- [ ] Attack pattern visualization (charts/graphs)
+- [ ] Email/SMS alerts for critical attacks
+- [ ] Geolocation mapping of attackers
+- [ ] Export reports (PDF/CSV)
 
 ---
 

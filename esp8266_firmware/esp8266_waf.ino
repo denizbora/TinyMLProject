@@ -27,6 +27,11 @@ const int WAF_PORT = 80;                    // ESP8266'nın dinleyeceği port
 const char* BACKEND_HOST = "192.168.1.100"; // Gerçek web sunucusu IP
 const int BACKEND_PORT = 8080;              // Gerçek web sunucusu port
 
+// Dashboard ayarları
+const char* DASHBOARD_HOST = "192.168.1.100"; // Dashboard backend IP
+const int DASHBOARD_PORT = 5000;              // Dashboard backend port
+const bool DASHBOARD_ENABLED = true;          // Dashboard reporting aktif/pasif
+
 // Model threshold
 const float MALICIOUS_THRESHOLD = 0.5f;     // >0.5 = malicious
 
@@ -41,6 +46,9 @@ void extractFeaturesFromRequest(const char* method, const char* path, const char
 void forwardToBackend(WiFiClient& client, const String& method, const String& path, 
                      const String& query, String headers[], int headerCount);
 void blockRequest(WiFiClient& client, float probability);
+void reportToDashboard(const String& method, const String& path, const String& query,
+                      const String& userAgent, float probability, const String& classification,
+                      const String& action, const String& clientIP);
 
 // ===== GLOBAL VARIABLES =====
 WiFiServer wafServer(WAF_PORT);
@@ -197,14 +205,26 @@ void loop() {
     }
     
     // Karar: benign ise forward et, malicious ise engelle
+    String classificationStr = (classification == 1) ? "MALICIOUS" : "BENIGN";
+    String action;
+    String clientIP = client.remoteIP().toString();
+    
     if (classification == 0) {
         // BENIGN - Backend'e forward et
         allowedCount++;
+        action = "ALLOWED";
         forwardToBackend(client, method, path, query, headers, headerCount);
     } else {
         // MALICIOUS - Engelle
         blockedCount++;
+        action = "BLOCKED";
         blockRequest(client, probability);
+    }
+    
+    // Dashboard'a rapor gönder
+    if (DASHBOARD_ENABLED) {
+        reportToDashboard(method, path, query, userAgent, probability, 
+                         classificationStr, action, clientIP);
     }
     
     client.stop();
@@ -374,4 +394,54 @@ void blockRequest(WiFiClient& client, float probability) {
     client.println("%</p>");
     client.println("<hr><p><small>ESP8266 TinyML Mini-WAF</small></p>");
     client.println("</body></html>");
+}
+
+void reportToDashboard(const String& method, const String& path, const String& query,
+                      const String& userAgent, float probability, const String& classification,
+                      const String& action, const String& clientIP) {
+    WiFiClient dashboardClient;
+    
+    if (!dashboardClient.connect(DASHBOARD_HOST, DASHBOARD_PORT)) {
+        if (DEBUG_MODE) {
+            Serial.println("[!] Dashboard connection failed");
+        }
+        return;
+    }
+    
+    // JSON payload oluştur
+    String payload = "{";
+    payload += "\"method\":\"" + method + "\",";
+    payload += "\"path\":\"" + path + "\",";
+    payload += "\"query\":\"" + query + "\",";
+    payload += "\"user_agent\":\"" + userAgent + "\",";
+    payload += "\"probability\":" + String(probability, 4) + ",";
+    payload += "\"classification\":\"" + classification + "\",";
+    payload += "\"action\":\"" + action + "\",";
+    payload += "\"client_ip\":\"" + clientIP + "\"";
+    payload += "}";
+    
+    // HTTP POST request
+    dashboardClient.println("POST /api/report HTTP/1.1");
+    dashboardClient.print("Host: ");
+    dashboardClient.println(DASHBOARD_HOST);
+    dashboardClient.println("Content-Type: application/json");
+    dashboardClient.print("Content-Length: ");
+    dashboardClient.println(payload.length());
+    dashboardClient.println("Connection: close");
+    dashboardClient.println();
+    dashboardClient.println(payload);
+    
+    // Response'u bekle (opsiyonel)
+    unsigned long timeout = millis() + 1000;
+    while (dashboardClient.connected() && millis() < timeout) {
+        if (dashboardClient.available()) {
+            dashboardClient.read(); // Response'u oku ama kullanma
+        }
+    }
+    
+    dashboardClient.stop();
+    
+    if (DEBUG_MODE) {
+        Serial.println("[+] Reported to dashboard");
+    }
 }
